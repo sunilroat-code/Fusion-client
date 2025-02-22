@@ -7,6 +7,7 @@ import {
   Button,
   ActionIcon,
   Tooltip,
+  useMantineTheme,
 } from "@mantine/core";
 import { Archive, PencilSimple } from "@phosphor-icons/react";
 import { notifications } from "@mantine/notifications";
@@ -25,27 +26,23 @@ export default function Draft() {
   const username = useSelector((state) => state.user.name);
   let current_module = useSelector((state) => state.module.current_module);
   current_module = current_module.split(" ").join("").toLowerCase();
+  useMantineTheme();
 
   useEffect(() => {
     const getFiles = async () => {
       try {
-        const response = await axios.get(
-          `${getDraftRoute}`,
-
-          {
-            params: {
-              username,
-              designation: role,
-              src_module: current_module,
-            },
-            withCredentials: true,
-            headers: {
-              Authorization: `Token ${token}`,
-              "Content-Type": "multipart/form-data",
-            },
+        const response = await axios.get(`${getDraftRoute}`, {
+          params: {
+            username,
+            designation: role,
+            src_module: current_module, // Adding module to params
           },
-        );
-        // Set the response data to the files state
+          withCredentials: true,
+          headers: {
+            Authorization: `Token ${token}`, // Corrected template literal usage
+            "Content-Type": "multipart/form-data",
+          },
+        });
         setFiles(response.data);
         console.log(response.data);
       } catch (err) {
@@ -53,43 +50,68 @@ export default function Draft() {
       }
     };
 
-    // Call the getFiles function to fetch data on component mount
     getFiles();
-  }, []);
+  }, [current_module, username, role, token]); // Added dependencies for useEffect
+
   const [editFile, setEditFile] = useState(null); // File being edited
 
   const handleArchive = async (fileID) => {
-    // eslint-disable-next-line no-unused-vars
-    const response = await axios.post(
-      `${createArchiveRoute}`,
-      {
-        file_id: fileID,
-      },
-      {
-        params: {
-          username,
-          designation: role,
-          src_module: current_module,
+    try {
+      const response = await axios.post(
+        `${createArchiveRoute}`,
+        {
+          file_id: fileID,
         },
-        withCredentials: true,
-        headers: {
-          Authorization: `Token ${token}`,
-          "Content-Type": "multipart/form-data",
+        {
+          params: {
+            username,
+            designation: role,
+            src_module: current_module,
+          },
+          withCredentials: true,
+          headers: {
+            Authorization: `Token ${token}`, // Corrected template literal usage
+            "Content-Type": "multipart/form-data",
+          },
         },
-      },
-    );
-    const updatedFiles = files.filter((file) => file.id !== fileID);
-    setFiles(updatedFiles);
+      );
+
+      if (response.status === 200) {
+        const updatedFiles = files.filter((file) => file.id !== fileID);
+        setFiles(updatedFiles);
+
+        notifications.show({
+          title: "File Archived",
+          message: "The file has been successfully archived.",
+          color: "green",
+        });
+      }
+    } catch (error) {
+      console.error("Error archiving file:", error);
+      notifications.show({
+        title: "Error",
+        message: "There was an issue archiving the file.",
+        color: "red",
+      });
+    }
   };
 
   const handleDeleteFile = async (fileID) => {
-    // const response = await axios.delete
-    setFiles((prevFiles) => prevFiles.filter((file) => file.fileID !== fileID));
-    notifications.show({
-      title: "File deleted",
-      message: "The file has been successfully deleted",
-      color: "red",
-    });
+    try {
+      await axios.delete(`${getDraftRoute}/${fileID}`, {
+        headers: {
+          Authorization: `Token ${token}`, // Authorization header
+        },
+      });
+      setFiles((prevFiles) => prevFiles.filter((file) => file.id !== fileID));
+      notifications.show({
+        title: "File deleted",
+        message: "The file has been successfully deleted",
+        color: "red",
+      });
+    } catch (error) {
+      console.error("Error deleting file:", error);
+    }
   };
 
   const handleEditFile = (file) => {
@@ -127,91 +149,82 @@ export default function Draft() {
           style={{
             border: "1px solid #ddd",
             borderRadius: "8px",
-            overflowY: "auto",
-            height: "56vh",
+            overflowY: "auto", // Enable vertical scrolling
+            height: "40vh", // Fixed height for the container
             backgroundColor: "#fff",
+            overflowX: "auto", // Enable horizontal scrolling if needed
           }}
         >
-          <Table
-            highlightOnHover
-            style={{
-              width: "100%",
-              borderCollapse: "collapse",
-              tableLayout: "fixed",
-              fontSize: "14px",
-            }}
-          >
+          {/* Add CSS directly in the component */}
+          <style>
+            {`
+              /* Default desktop styles */
+              .responsive-table {
+                width: 100%;
+                border-collapse: collapse;
+              }
+
+              .responsive-table th, .responsive-table td {
+                padding: 12px;
+                border: 1px solid #ddd;
+                text-align: center;
+              }
+
+              /* Mobile Styles */
+              @media (max-width: 768px) {
+                .responsive-table thead {
+                  display: none;
+                }
+
+                .responsive-table tbody, .responsive-table tr, .responsive-table td {
+                  display: block;
+                  width: 100%;
+                }
+
+                .responsive-table td {
+                  padding: 10px;
+                  text-align: center; /* Center content on mobile */
+                  position: relative;
+                  border: none;
+                  border-bottom: 1px solid #ddd;
+                }
+
+                .responsive-table td:before {
+                  content: attr(data-label);
+                  font-weight: bold;
+                  display: block;
+                  margin-bottom: 5px;
+                }
+
+                .responsive-table tr {
+                  margin-bottom: 10px;
+                  border: 1px solid #ddd;
+                  border-radius: 8px;
+                }
+
+                .responsive-table td:last-child {
+                  border-bottom: none;
+                }
+              }
+            `}
+          </style>
+
+          {/* Table component */}
+          <Table className="responsive-table">
             <thead>
-              <tr style={{ backgroundColor: "#0000" }}>
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "8%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  Archive
-                </th>
-                {/* <th style={{ padding: "12px", border: "1px solid #ddd" }}>
-                  File type
-                </th> */}
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "12%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  Being Sent to
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "12%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  File ID
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "33%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  Subject
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "12.5%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  Delete draft
-                </th>
-                <th
-                  style={{
-                    padding: "12px",
-                    width: "8.5%",
-                    border: "1px solid #ddd",
-                  }}
-                >
-                  Edit Draft
-                </th>
+              <tr>
+                <th>Archive</th>
+                <th>Being Sent to</th>
+                <th>File ID</th>
+                <th>Subject</th>
+                <th>Delete draft</th>
+                <th>Edit Draft</th>
               </tr>
             </thead>
             <tbody>
               {files.map((file, index) => (
                 <tr key={index}>
-                  <td
-                    style={{
-                      padding: "8px",
-                      textAlign: "center",
-                      border: "1px solid #ddd",
-                    }}
-                  >
+                  <td data-label="Archive">
                     <Tooltip label="Archive file" position="top" withArrow>
                       <ActionIcon
                         variant="light"
@@ -236,49 +249,10 @@ export default function Draft() {
                       </ActionIcon>
                     </Tooltip>
                   </td>
-                  {/* <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                    }}
-                  >
-                    {file.fileType}
-                  </td> */}
-                  <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                    }}
-                  >
-                    {file.uploader}
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                    }}
-                  >
-                    {file.id}
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                    }}
-                  >
-                    {file.subject}
-                  </td>
-                  <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                    }}
-                  >
+                  <td data-label="Being Sent to">{file.uploader}</td>
+                  <td data-label="File ID">{file.id}</td>
+                  <td data-label="Subject">{file.subject}</td>
+                  <td data-label="Delete draft">
                     <Button
                       color="blue"
                       variant="outline"
@@ -300,14 +274,7 @@ export default function Draft() {
                       Delete file
                     </Button>
                   </td>
-                  <td
-                    style={{
-                      padding: "12px",
-                      border: "1px solid #ddd",
-                      textAlign: "center",
-                      verticalAlign: "middle",
-                    }}
-                  >
+                  <td data-label="Edit Draft">
                     <ActionIcon
                       variant="outline"
                       color="black"
@@ -316,7 +283,7 @@ export default function Draft() {
                         width: "2rem",
                         height: "2rem",
                       }}
-                      onClick={() => handleEditFile(file)} // Switch to edit mode
+                      onClick={() => handleEditFile(file)}
                       // eslint-disable-next-line no-return-assign
                       onMouseEnter={(e) =>
                         (e.currentTarget.style.backgroundColor = "#e0e0e0")
